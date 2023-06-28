@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "my-chat-ede27"
+  },
+    "emulators": {
+      "firestore": {
+        "port": 8085
+      },
+      "auth": {
+        "port": 9099
+      },
+
+    }
+}

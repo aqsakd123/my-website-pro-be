@@ -1,0 +1,42 @@
+services:
+  db:
+    container_name: postgresql_db
+    image: postgres:14.1
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      PGDATA: /data/postgres
+    volumes:
+      - db:/data/postgres
+    ports:
+      - "5332:5432"
+    networks:
+      - db
+    restart: unless-stopped
+  my-website-pro-be:
+    container_name: my-website-pro-be
+    image: my-website-pro-be:v1.0
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/shop
+    ports:
+      - "8080:8080"
+    networks:
+      - db
+    depends_on:
+      - db
+    restart: unless-stopped
+  my-website-pro-fe:
+    container_name: my-website-pro-fe
+    image: my-website-pro-fe:v1.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - my-website-pro-be
+    restart: unless-stopped
+
+networks:
+  db:
+    driver: bridge
+
+volumes:
+  db:
