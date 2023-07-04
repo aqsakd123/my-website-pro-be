@@ -42,7 +42,7 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
 
     private TaskCheckListMapper taskMapper = Mappers.getMapper(TaskCheckListMapper.class);
 
-    // TODO: Since the CRUD of typeCode PROJECT are no more needed infinite recursion, the serviceImpl should be implement using GraphQL
+    // TODO: Since the CRUD of typeCode PROJECT are no more needed infinite recursion, implement GraphQL in ServiceImpl instead
     // detailProject keep using RestAPI
 
     @Override
