@@ -45,6 +45,7 @@ public interface TaskRepository extends JpaRepository<TaskCheckList, Long>, JpaS
             "FROM TaskCheckList t " +
             "left join fetch t.children child " +
             "WHERE t.isDeleted = false " +
+            "and t.isCompleted = false " +
             "and t.createdBy = :#{#filterRequest.author} " +
             "and ((t.typeCode = 'DAILY' AND t.routineType = 'DAILY' and " +
             "(t.startDate IS NOT NULL AND t.startDate <= :#{#filterRequest.searchDate}) " +

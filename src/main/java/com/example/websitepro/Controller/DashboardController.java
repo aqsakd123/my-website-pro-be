@@ -24,7 +24,7 @@ public class DashboardController {
     }
 
     @GetMapping("/get-time-line-stream")
-    public Flux<ServerSentEvent<List<TaskDetailResponse>>> streamLastMessage(@RequestParam("email") String email) {
+    public Flux<ServerSentEvent<List<TaskDetailResponse>>> streamCurrentDateTaskList(@RequestParam("email") String email) {
         TaskFilterRequest request = new TaskFilterRequest();
         request.setAuthor(email);
         return taskService.getTaskDashboardSSE(request);

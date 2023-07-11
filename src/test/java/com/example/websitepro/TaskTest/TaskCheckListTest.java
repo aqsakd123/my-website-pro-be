@@ -1,12 +1,14 @@
 package com.example.websitepro.TaskTest;
 
+import com.example.websitepro.Config.Constant;
 import com.example.websitepro.Entity.DTO.TaskCheckListDTO;
 import com.example.websitepro.Entity.Mapper.TaskCheckListMapper;
 import com.example.websitepro.Entity.Request.TaskFilterRequest;
 import com.example.websitepro.Entity.Response.TaskDetailResponse;
 import com.example.websitepro.Entity.TaskCheckList;
 import com.example.websitepro.Repository.TaskRepository;
-import com.example.websitepro.Service.Impl.TaskCheckListServiceImpl;
+import com.example.websitepro.Service.CalculatingEXPPoint;
+import com.example.websitepro.Service.Impl.*;
 import com.example.websitepro.Service.TaskCheckListService;
 import org.junit.Assert;
 import org.junit.Before;
@@ -26,6 +28,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static org.mockito.Mockito.*;
 
 @RunWith(SpringRunner.class)
 @DataJpaTest
@@ -87,11 +91,11 @@ public class TaskCheckListTest {
         TaskFilterRequest filter5 = TaskFilterRequest.builder().typeCode("TODO").author("user1").completed(true).build();
 
         // actual
-        List<TaskCheckListDTO> test1 = taskCheckListService.filterTaskList(filter1);
-        List<TaskCheckListDTO> test2 = taskCheckListService.filterTaskList(filter2);
-        List<TaskCheckListDTO> test3 = taskCheckListService.filterTaskList(filter3);
-        List<TaskCheckListDTO> test4 = taskCheckListService.filterTaskList(filter4);
-        List<TaskCheckListDTO> test5 = taskCheckListService.filterTaskList(filter5);
+        List<TaskCheckList> test1 = taskCheckListService.filterTaskList(filter1);
+        List<TaskCheckList> test2 = taskCheckListService.filterTaskList(filter2);
+        List<TaskCheckList> test3 = taskCheckListService.filterTaskList(filter3);
+        List<TaskCheckList> test4 = taskCheckListService.filterTaskList(filter4);
+        List<TaskCheckList> test5 = taskCheckListService.filterTaskList(filter5);
 
         // test
         Assert.assertEquals(2, test1.size());
@@ -111,6 +115,61 @@ public class TaskCheckListTest {
         Assert.assertEquals("Task 15", test5.get(1).getName());
     }
 
+    @Test
+    public void testCalculateStrategy() {
+
+        // check if choose Strategy correct
+        CalculatingEXPPoint strategyToDO = taskCheckListService.chooseStrategy("TODO");
+        CalculatingEXPPoint strategyDaily = taskCheckListService.chooseStrategy("DAILY");
+        CalculatingEXPPoint strategyProject = taskCheckListService.chooseStrategy("PROJECT");
+        CalculatingEXPPoint strategyHobby = taskCheckListService.chooseStrategy("HOBBY");
+
+        Assert.assertEquals(strategyDaily instanceof TypeDailyCalculateEXPStrategy, true);
+        Assert.assertEquals(strategyToDO instanceof TypeToDoCalculateEXPStrategy, true);
+        Assert.assertEquals(strategyProject instanceof TypeProjectCalculateEXPStrategy, true);
+        Assert.assertEquals(strategyHobby instanceof TypeHobbyCalculateEXPStrategy, true);
+
+        // test using mocking calculate functions
+        TaskCheckList taskCheckList = new TaskCheckList();
+
+        TypeDailyCalculateEXPStrategy mockDailyStrategy = spy(TypeDailyCalculateEXPStrategy.class);
+
+        when(mockDailyStrategy.calculateFinishEXPTask(taskCheckList)).thenReturn(10);
+        when(mockDailyStrategy.calculateFinishUndoTask(taskCheckList)).thenReturn(20);
+
+        TypeHobbyCalculateEXPStrategy mockHobbyStrategy = spy(TypeHobbyCalculateEXPStrategy.class);
+
+        when(mockHobbyStrategy.calculateFinishEXPTask(taskCheckList)).thenReturn(30);
+        when(mockHobbyStrategy.calculateFinishUndoTask(taskCheckList)).thenReturn(40);
+        when(mockHobbyStrategy.calculateDeleteTask(taskCheckList)).thenReturn(50);
+        when(mockHobbyStrategy.calculateUndoDeleteTask(taskCheckList)).thenReturn(60);
+        when(mockHobbyStrategy.calculateAddScore(taskCheckList)).thenReturn(70);
+        when(mockHobbyStrategy.calculateSubtractScore(taskCheckList)).thenReturn(80);
+
+        TypeToDoCalculateEXPStrategy mockToDoStrategy = spy(TypeToDoCalculateEXPStrategy.class);
+
+        when(mockToDoStrategy.calculateEXPTaskByAction(Constant.ACTION.COMPLETE,taskCheckList)).thenReturn(90);
+        when(mockToDoStrategy.calculateEXPTaskByAction(Constant.ACTION.UNDO_COMPLETE,taskCheckList)).thenReturn(100);
+        when(mockToDoStrategy.calculateEXPTaskByAction(Constant.ACTION.DELETE,taskCheckList)).thenReturn(110);
+        when(mockToDoStrategy.calculateEXPTaskByAction(Constant.ACTION.UNDO_DELETE,taskCheckList)).thenReturn(120);
+
+        TypeProjectCalculateEXPStrategy mockProjectStrategy = spy(TypeProjectCalculateEXPStrategy.class);
+
+        when(mockProjectStrategy.calculateEXPTaskByAction(Constant.ACTION.COMPLETE,taskCheckList)).thenReturn(130);
+        when(mockProjectStrategy.calculateEXPTaskByAction(Constant.ACTION.UNDO_COMPLETE,taskCheckList)).thenReturn(140);
+
+        Integer testDailyComplete = mockDailyStrategy.calculateEXPTaskByAction(Constant.ACTION.COMPLETE, taskCheckList);
+        verify(mockDailyStrategy, times(1)).calculateFinishEXPTask(taskCheckList);
+        Assert.assertEquals((long) testDailyComplete, (long) 10);
+
+        Integer testDailyUndo = mockDailyStrategy.calculateEXPTaskByAction(Constant.ACTION.UNDO_COMPLETE, taskCheckList);
+        verify(mockDailyStrategy, times(1)).calculateFinishUndoTask(taskCheckList);
+        Assert.assertEquals((long) testDailyUndo, (long) 20);
+
+        Integer testDailyDeleteAction = mockDailyStrategy.calculateEXPTaskByAction(Constant.ACTION.DELETE, taskCheckList);
+        Assert.assertEquals((long) testDailyDeleteAction, (long) 0);
+
+    }
 
     @Test
     public void testTimeLineDashboard() throws ParseException {
@@ -142,6 +201,7 @@ public class TaskCheckListTest {
 
     @Test
     public void testMapper() {
+        // Test Mapper Impl Generated function
         TaskCheckList childrenLv2No1 = TaskCheckList.builder().name("Task Grand Children 1").createdBy("user1").isDeleted(false).typeCode("DAILY").isCompleted(false).isDeleted(false).build();
         TaskCheckList childrenLv2No2 = TaskCheckList.builder().name("Task Grand Children 2").createdBy("user1").isDeleted(false).typeCode("DAILY").isCompleted(false).isDeleted(false).build();
 
@@ -163,6 +223,8 @@ public class TaskCheckListTest {
         TaskCheckListDTO test = taskMapper.toDTOWithoutChildren(Parent);
         Assert.assertEquals(null, test.getChildren());
         Assert.assertEquals(null, test.getRoutine());
+        Assert.assertEquals("Task 1", test.getName());
+        Assert.assertEquals("DAILY", test.getTypeCode());
 
     }
 }

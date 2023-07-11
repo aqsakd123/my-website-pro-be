@@ -6,8 +6,11 @@ import com.example.websitepro.Entity.Request.TaskFilterRequest;
 import com.example.websitepro.Entity.Request.UpdateTaskDTO;
 import com.example.websitepro.Entity.Request.UpdateTaskRequest;
 import com.example.websitepro.Entity.Response.TaskDetailResponse;
+import com.example.websitepro.Entity.TaskCheckList;
 import com.example.websitepro.Service.TaskCheckListService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.access.prepost.PostAuthorize;
@@ -35,15 +38,16 @@ public class TaskController {
         return ResponseEntity.ok(taskService.update(task));
     }
 
-    @GetMapping("/detail/{id}")
-    @PostAuthorize("authentication.name == returnObject.body.createdBy")
-    public ResponseEntity<?> detail(@PathVariable("id") Long id){
-        return ResponseEntity.ok(taskService.detail(id));
+    @QueryMapping
+    @PreAuthorize("authentication.name.length() > 0")
+    public List<?> filter(@Argument TaskFilterRequest filterRequest){
+        return taskService.filterTaskList(filterRequest);
     }
 
-    @PostMapping("/filter")
-    public ResponseEntity<?> filter(@RequestBody TaskFilterRequest filterRequest){
-        return ResponseEntity.ok(taskService.filterTaskList(filterRequest));
+    @QueryMapping
+    @PostAuthorize("authentication.name == returnObject.createdBy")
+    public TaskCheckList findTaskById(@Argument Long id){
+        return taskService.detail(id);
     }
 
     @PostMapping("/change-status")
@@ -54,11 +58,6 @@ public class TaskController {
     @PostMapping("/insert-sub-task/{parentId}")
     public ResponseEntity<?> insertSubTask(@PathVariable("parentId") Long parentId , @RequestBody TaskCheckListDTO task){
         return ResponseEntity.ok(taskService.saveSubGroupTask(parentId, task));
-    }
-
-    @PostMapping("/update-sub-task/{id}")
-    public ResponseEntity<?> updateSubTask(@PathVariable("id") Long id ,@RequestBody UpdateTaskDTO task){
-        return ResponseEntity.ok(taskService.modifySubTask(id, task));
     }
 
     @GetMapping("/project-detail/{id}")

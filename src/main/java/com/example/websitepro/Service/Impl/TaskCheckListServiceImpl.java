@@ -12,8 +12,10 @@ import com.example.websitepro.Entity.Response.TaskDetailResponse;
 import com.example.websitepro.Entity.Response.TaskProjection;
 import com.example.websitepro.Entity.TaskCheckList;
 import com.example.websitepro.Repository.TaskRepository;
+import com.example.websitepro.Service.CalculatingEXPPoint;
 import com.example.websitepro.Service.TaskCheckListService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.mapstruct.factory.Mappers;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.codec.ServerSentEvent;
@@ -36,14 +38,12 @@ import java.util.stream.Collectors;
 @EnableScheduling
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class TaskCheckListServiceImpl implements TaskCheckListService {
 
     private final TaskRepository taskRepo;
 
     private TaskCheckListMapper taskMapper = Mappers.getMapper(TaskCheckListMapper.class);
-
-    // TODO: Since the CRUD of typeCode PROJECT are no more needed infinite recursion, implement GraphQL in ServiceImpl instead
-    // detailProject keep using RestAPI
 
     @Override
     public TaskCheckListDTO save(TaskCheckListDTO task) {
@@ -68,15 +68,18 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
 
         TaskCheckList detail = taskMapper.ToEntityFromUpdateRequest(task);
 
-        List<TaskCheckList> newList = detail.getChildren().stream().map(item -> {
-            if(item.getId() != null && item.getTypeGroup() == 2L && listChildrenRes.stream().anyMatch(resItem -> resItem.getId().equals(item.getId()))){
-                item.setChildren(listChildrenRes.stream().filter(resItem -> resItem.getId().equals(item.getId())).findFirst().get().getChildren());
-            }
-            return item;
-        }).collect(Collectors.toList());
+        // TODO: 3. If in res, isComplete != task.isComplete || isDelete != task.isDeleted, calculate EXP to add to user
 
-        detail.setChildren(newList);
+        if(!detail.getTypeCode().equals("HOBBY")){
+            List<TaskCheckList> newList = detail.getChildren().stream().map(item -> {
+                if(item.getId() != null && item.getTypeGroup() == 2L && listChildrenRes.stream().anyMatch(resItem -> resItem.getId().equals(item.getId()))){
+                    item.setChildren(listChildrenRes.stream().filter(resItem -> resItem.getId().equals(item.getId())).findFirst().get().getChildren());
+                }
+                return item;
+            }).collect(Collectors.toList());
 
+            detail.setChildren(newList);
+        }
         taskRepo.save(detail);
 
         return TaskCheckListDTO.builder()
@@ -85,10 +88,10 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
     }
 
     @Override
-    public TaskDetailResponse detail(Long id) {
+    public TaskCheckList detail(Long id) {
         TaskCheckList result = taskRepo.findById(id)
                 .orElseThrow(() -> new WebException(Constant.MESSAGE.ID_NOT_FOUND));
-        return taskMapper.toDetailDTO(result);
+        return result;
     }
 
     @Override
@@ -101,66 +104,14 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
     public TaskCheckListDTO changeStatus(TaskChangeStatusRequest task) {
         TaskCheckList response = taskRepo.findById(task.getId())
                 .orElseThrow(() -> new WebException(Constant.MESSAGE.ID_NOT_FOUND));
-
-        // Take note to do later
-        // Write a task action log aboute DELETE/UNDO_DELETE/COMPLETE/UNDO_COMPLETE/SCORING
-
-        if (task.getAction().equals(Constant.ACTION.DELETE)) {
-
-            // Remove all EXP gained from the task or subtask
-            // run query set IS_DELETED all id || projectParentId = task.getId
-            // if response.getProjectParentId = null change status all children
-
-            response.setIsDeleted(true);
-
-        } else if (task.getAction().equals(Constant.ACTION.UNDO_DELETE)){
-
-            // Restore all EXP gained from the task or subtask
-            // run query set IS_DELETED false all id || projectParentId = task.getId
-            // if response.getProjectParentId = null change status all children
-
-            response.setIsDeleted(false);
-
-        } else if (task.getAction().equals(Constant.ACTION.COMPLETE)) {
-
-            // GAINED 1 SCORE
-            // Perform action similar to STREAKS ?????
-            // if DAILY and 1 day not finish, lose streak and SCORE
-            // if DAILY and finish all DAILY task (task no parent_id) gain more EXP
-            response.setIsCompleted(true);
-            response.setIsCredited(1L);
-
-        } else if (task.getAction().equals(Constant.ACTION.UNDO_COMPLETE)) {
-
-            // -1 SCORE
-            // LOSE STREAK
-            // LOSE PRIZE ALL DAILY TASK DONE
-            response.setIsCompleted(false);
-
-        } else if (task.getAction().equals(Constant.ACTION.CHANGE_POSITION)) {
-
-            response.setTaskListOrder(task.getPosition());
-
-        } else if (task.getAction().equals(Constant.ACTION.ADD_SCORE)) {
-
-            // Add EXP if + 1
-            // In ADD Streak, add more EXP
-            response.setTotalCredit(response.getTotalCredit() + 1);
-
-        } else if (task.getAction().equals(Constant.ACTION.SUBTRACT_SCORE)) {
-
-            // DESTROY STREAK
-            // If in 1 day no action, - 1
-            response.setTotalCredit(response.getTotalCredit() - 1);
-        } else {
-            throw new WebException(Constant.MESSAGE.ACTION_NOT_EXIST);
-        }
+        changeStatusByAction(response, task);
+        calculateEXPAndSave(task.getAction(), response);
         taskRepo.save(response);
         return taskMapper.toDTO(response);
     }
 
     @Override
-    public List<TaskCheckListDTO> filterTaskList(TaskFilterRequest filter) {
+    public List<TaskCheckList> filterTaskList(TaskFilterRequest filter) {
         if (!StringUtils.hasLength(filter.getOrderItem())) {
             filter.setOrderItem("taskListOrder");
         }
@@ -173,13 +124,14 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
         if (filter.getSearchDate() == null) {
             filter.setSearchDate(Calendar.getInstance().getTime());
         }
+
         if (!StringUtils.hasLength(filter.getAuthor())) {
             Authentication authen = SecurityContextHolder.getContext().getAuthentication();
             filter.setAuthor(authen.getName());
         }
 
         Sort sort = Sort.by(filter.getOrder().equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, filter.getOrderItem());
-        return taskMapper.toListDTOWithoutChildren(taskRepo.filter(filter, sort));
+        return taskRepo.filter(filter, sort);
     }
 
     @Override
@@ -208,27 +160,6 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
     }
 
     @Override
-    public TaskCheckListDTO modifySubTask(Long id, UpdateTaskDTO task) {
-        //not use
-        TaskCheckList response = taskRepo.findById(id)
-                .orElseThrow(() -> new WebException(Constant.MESSAGE.ID_NOT_FOUND));
-        if (task.getEndDate() != null){
-            response.setEndDate(task.getEndDate());
-        }
-        if (task.getLoopTime() != null){
-            response.setLoopTime(task.getLoopTime());
-        }
-        if (StringUtils.hasLength(task.getName())){
-            response.setName(task.getName());
-        }
-        taskRepo.save(response);
-
-        return TaskCheckListDTO.builder()
-                .id(response.getId())
-                .build();
-    }
-
-    @Override
     public Flux<ServerSentEvent<List<TaskDetailResponse>>> getTaskDashboardSSE(TaskFilterRequest filter) {
         try {
             return Flux.interval(Duration.ofSeconds(1))
@@ -249,4 +180,52 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
         taskRepo.restartHobby();
     }
 
+    public CalculatingEXPPoint chooseStrategy(String typeCode){
+        CalculatingEXPPoint strategy = null;
+
+        if (typeCode.equals("HOBBY")){
+            strategy = new TypeHobbyCalculateEXPStrategy();
+        } else if (typeCode.equals("TODO")) {
+            strategy = new TypeToDoCalculateEXPStrategy();
+        } else if (typeCode.equals("PROJECT")) {
+            strategy = new TypeProjectCalculateEXPStrategy();
+        } else if (typeCode.equals("DAILY")) {
+            strategy = new TypeDailyCalculateEXPStrategy();
+        }
+
+        return strategy;
+    }
+
+    public void calculateEXPAndSave(String action, TaskCheckList taskCheckList){
+        CalculatingEXPPoint strategy = chooseStrategy(taskCheckList.getTypeCode());
+        Integer exp = strategy.calculateEXPTaskByAction(action, taskCheckList);
+        if(exp != 0) {
+            log.info("SCORE: " + exp);
+            // ToDo: 1. Design formula calculate exp score of each action depend on each typeCode (based on: children size, due date, priority, etc)
+            // ToDo: 2. Save in to DB
+        }
+    }
+
+    public void changeStatusByAction(TaskCheckList response, TaskChangeStatusRequest task){
+        String action = task.getAction();
+        if (action.equals(Constant.ACTION.DELETE)) {
+            response.setIsDeleted(true);
+        } else if (action.equals(Constant.ACTION.UNDO_DELETE)){
+            response.setIsDeleted(false);
+        } else if (action.equals(Constant.ACTION.COMPLETE)) {
+            response.setIsCompleted(true);
+            response.setIsCredited(1L);
+        } else if (action.equals(Constant.ACTION.UNDO_COMPLETE)) {
+            response.setIsCompleted(false);
+        } else if (action.equals(Constant.ACTION.CHANGE_POSITION)) {
+            response.setTaskListOrder(task.getPosition());
+        } else if (action.equals(Constant.ACTION.ADD_SCORE)) {
+            response.setTotalCredit(response.getTotalCredit() + 1);
+        } else if (action.equals(Constant.ACTION.SUBTRACT_SCORE)) {
+            response.setTotalCredit(response.getTotalCredit() - 1);
+        } else {
+            throw new WebException(Constant.MESSAGE.ACTION_NOT_EXIST);
+        }
+
+    }
 }

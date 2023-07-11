@@ -1,0 +1,68 @@
+type Query {
+    filter(filterRequest: FilterRequest): [Task]
+    findTaskById(id: ID!): Task
+}
+
+input FilterRequest {
+    order: String
+    orderItem: String
+    searchDate: String
+    typeCode: String
+    author: String
+    completed: Boolean
+}
+
+input TaskInput {
+    id: Float
+    name: String
+    description: String
+    startDate: String
+    endDate: String
+    loopTime: String
+    createdDate: String
+    createdBy: String
+    modifyDate: String
+    modifiedBy: String
+    priority: Float
+    taskListOrder: Float
+    typeCode: String
+    typeGroup: Float
+    totalCredit: Float
+    isCredited: Float
+    routineDate: Float
+    routineType: String
+    pinned: Boolean
+    isCompleted: Boolean
+    isDeleted: Boolean
+    projectParentId: Float
+    children: [TaskInput]
+    routine: [String]
+}
+
+type Task {
+    id: ID!
+    name: String
+    description: String
+    startDate: String
+    endDate: String
+    loopTime: String
+    createdDate: String
+    createdBy: String
+    modifyDate: String
+    modifiedBy: String
+    priority: Float
+    taskListOrder: Float
+    typeCode: String
+    typeGroup: Float
+    totalCredit: Float
+    isCredited: Float
+    routineDate: Float
+    routineType: String
+    pinned: Boolean
+    isCompleted: Boolean
+    isDeleted: Boolean
+    projectParentId: Float
+    children: [Task]
+    routine: [String]
+}
+

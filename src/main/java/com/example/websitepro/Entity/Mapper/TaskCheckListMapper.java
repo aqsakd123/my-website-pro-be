@@ -21,17 +21,7 @@ public interface TaskCheckListMapper {
 
     TaskCheckList toEntity(TaskCheckListDTO dto);
 
-    TaskDetailResponse toDetailDTO(TaskCheckList task);
-
     TaskCheckList ToEntityFromUpdateRequest(UpdateTaskRequest task);
-
-    @Named(value = "toDTOWithoutChildren")
-    @Mapping(target = "routine", ignore = true)
-    @Mapping(target = "children", ignore = true)
-    TaskCheckListDTO toDTOWithoutChildren(TaskCheckList taskChecklist);
-
-    @IterableMapping(qualifiedByName = "toDTOWithoutChildren")
-    List<TaskCheckListDTO> toListDTOWithoutChildren(List<TaskCheckList> entity);
 
     @Named(value = "toDetailDTONoRoutine")
     @Mapping(target = "routine", ignore = true)
@@ -39,4 +29,9 @@ public interface TaskCheckListMapper {
 
     @IterableMapping(qualifiedByName = "toDetailDTONoRoutine")
     List<TaskDetailResponse> toListNoLv2Child(List<TaskCheckList> entity);
+
+    @Named(value = "toDTOWithoutChildren")
+    @Mapping(target = "routine", ignore = true)
+    @Mapping(target = "children", ignore = true)
+    TaskCheckListDTO toDTOWithoutChildren(TaskCheckList taskChecklist);
 }

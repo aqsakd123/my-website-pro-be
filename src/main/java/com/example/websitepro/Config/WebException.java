@@ -13,7 +13,7 @@ public class WebException extends RuntimeException{
 
     public WebException(String message) {
         super(message);
-        this.status = HttpStatus.OK;
+        this.status = HttpStatus.BAD_REQUEST;
     }
 
     public HttpStatus getStatus() {
