@@ -21,7 +21,8 @@ public interface TaskRepository extends JpaRepository<TaskCheckList, Long>, JpaS
             "and t.createdBy = :#{#filterRequest.author} " +
             "and t.isDeleted = false " +
             "and (:#{#filterRequest.typeCode} is null or t.typeCode = :#{#filterRequest.typeCode}) " +
-            " ")
+            "order by t.pinned desc " +
+            "")
     List<TaskCheckList> filter(TaskFilterRequest filterRequest, Sort sort);
 
     @Query(value = "select " +
