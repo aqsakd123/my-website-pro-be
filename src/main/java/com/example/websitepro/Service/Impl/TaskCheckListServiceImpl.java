@@ -73,6 +73,7 @@ public class TaskCheckListServiceImpl implements TaskCheckListService {
         if(!detail.getTypeCode().equals("HOBBY")){
             List<TaskCheckList> newList = detail.getChildren().stream().map(item -> {
                 if(item.getId() != null && item.getTypeGroup() == 2L && listChildrenRes.stream().anyMatch(resItem -> resItem.getId().equals(item.getId()))){
+                    // if item is group check list, update children as in res get from DB (as UpdateTaskRequest shouldn't have this value, this is to prevent children from turning empty
                     item.setChildren(listChildrenRes.stream().filter(resItem -> resItem.getId().equals(item.getId())).findFirst().get().getChildren());
                 }
                 return item;
